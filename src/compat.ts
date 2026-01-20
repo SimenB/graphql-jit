@@ -7,7 +7,9 @@ import {
   type ASTNode,
   type OperationDefinitionNode,
   type GraphQLObjectType,
-  type GraphQLFormattedError
+  type GraphQLFormattedError,
+  type ConstValueNode,
+  GraphQLScalarType
 } from "graphql";
 import { type Maybe } from "./types.js";
 import * as errorUtilities from "graphql/error/index.js";
@@ -112,4 +114,22 @@ export function resolveFieldDef(
     parentType,
     fieldNode.name.value
   );
+}
+
+/**
+ * v17 deprecates parseLiteral in favor of coerceInputLiteral for custom scalars
+ * However, custom scalars may still only define parseLiteral, so we check
+ * for the method's existence rather than just the version.
+ */
+export function coerceInputLiteral(
+  type: GraphQLScalarType<unknown, unknown>,
+  valueNode: ConstValueNode
+): any {
+  // Use coerceInputLiteral if available (built-in scalars in v17+)
+  // Otherwise fall back to parseLiteral (custom scalars, or v16)
+  if ((type as any).coerceInputLiteral) {
+    return (type as any).coerceInputLiteral(valueNode);
+  }
+
+  return (type as any).parseLiteral(valueNode, {});
 }

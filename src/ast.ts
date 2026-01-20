@@ -29,12 +29,16 @@ import {
   type SelectionNode,
   type TypeNode,
   isAbstractType,
-  Source,
-  Location
+  Location,
+  type ConstValueNode
 } from "graphql";
 import { type CompilationContext, GLOBAL_VARIABLES_NAME } from "./execution.js";
 import createInspect from "./inspect.js";
-import { getGraphQLErrorOptions, resolveFieldDef } from "./compat.js";
+import {
+  coerceInputLiteral,
+  getGraphQLErrorOptions,
+  resolveFieldDef
+} from "./compat.js";
 
 export interface JitFieldNode extends FieldNode {
   /**
@@ -945,18 +949,13 @@ export function valueFromAST(
   }
 
   if (isScalarType(type)) {
-    // Scalars fulfill parsing a literal value via parseLiteral().
+    // Scalars fulfill parsing a literal value via coerceInputLiteral().
     // Invalid values represent a failure to parse correctly, in which case
     // no value is returned.
     let result: any;
     try {
-      if (type.parseLiteral.length > 1) {
-        // eslint-disable-next-line
-        console.error(
-          "Scalar with variable inputs detected for parsing AST literals. This is not supported."
-        );
-      }
-      result = type.parseLiteral(valueNode, {});
+      // By this point, we've filtered out VARIABLE nodes, so valueNode is a ConstValueNode
+      result = coerceInputLiteral(type, valueNode as ConstValueNode);
     } catch (error) {
       return; // Invalid: intentionally return no value.
     }
