@@ -1,18 +1,40 @@
 name: Publish
 on:
+  push:
+    branches:
+      - main
   release:
-    types: [created]
+    types:
+      - created
+
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      # Setup .npmrc file to publish to npm
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
       - run: yarn install --immutable
-      - run: yarn publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish Canary
+        if: github.event_name == 'push' && github.ref_name == 'main'
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          CANARY_VERSION="${BASE_VERSION}-canary.${SHORT_SHA}"
+          npm pkg set version="$CANARY_VERSION"
+          npm publish --tag canary
+
+      - name: Publish Release
+        if: github.event_name == 'release' && github.event.action == 'created'
+        run: |
+          RELEASE_VERSION="${{ github.event.release.tag_name }}"
+          RELEASE_VERSION="${RELEASE_VERSION#v}"
+          npm pkg set version="$RELEASE_VERSION"
+          npm publish --tag latest
